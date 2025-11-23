@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: registry.noelvega.dev
-  IMAGE_NAME: deployment-agent 
+  IMAGE_NAME: hubble 
 
 jobs:
   build-and-push:
