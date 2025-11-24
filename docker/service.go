@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
 
@@ -93,4 +94,37 @@ func (s *Service) StartContainer(ctx context.Context, containerID string) error 
 		return fmt.Errorf("failed to start container: %w", err)
 	}
 	return nil
+}
+
+type ImageInfo struct {
+	ID          string   `json:"id"`
+	RepoTags    []string `json:"repo_tags"`
+	RepoDigests []string `json:"repo_digests"`
+	Size        int64    `json:"size"`
+	Created     int64    `json:"created"`
+}
+
+func (s *Service) ListImages(ctx context.Context) ([]ImageInfo, error) {
+	images, err := s.client.ImageList(ctx, image.ListOptions{All: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list images: %w", err)
+	}
+
+	result := make([]ImageInfo, 0, len(images))
+	for _, img := range images {
+		id := img.ID
+		if len(id) > 19 && id[:7] == "sha256:" {
+			id = id[7:19]
+		}
+
+		result = append(result, ImageInfo{
+			ID:          id,
+			RepoTags:    img.RepoTags,
+			RepoDigests: img.RepoDigests,
+			Size:        img.Size,
+			Created:     img.Created,
+		})
+	}
+
+	return result, nil
 }

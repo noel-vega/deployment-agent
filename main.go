@@ -10,6 +10,7 @@ import (
 	"github.com/noel-vega/deployment-agent/docker"
 	"github.com/noel-vega/deployment-agent/handlers"
 	"github.com/noel-vega/deployment-agent/middleware"
+	"github.com/noel-vega/deployment-agent/registry"
 )
 
 func main() {
@@ -33,9 +34,24 @@ func main() {
 	}
 	defer dockerService.Close()
 
+	// Initialize registry client
+	registryClient, err := registry.NewClient()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize registry client: %v", err)
+		log.Printf("Registry endpoints will not be available")
+	}
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler()
 	containersHandler := handlers.NewContainersHandler(dockerService)
+
+	// Initialize registry handler if registry client is available
+	var registryHandler *handlers.RegistryHandler
+	if registryClient != nil {
+		registryHandler = handlers.NewRegistryHandler(registryClient)
+		defer registryClient.Close()
+	}
+	imagesHandler := handlers.NewImagesHandler(dockerService)
 
 	// Setup router
 	r := chi.NewRouter()
@@ -59,9 +75,17 @@ func main() {
 		r.Use(middleware.Protected)
 
 		r.Get("/auth/me", authHandler.Me)
+
+		// Registry endpoints (if registry client is configured)
+		if registryHandler != nil {
+			r.Get("/registry/repositories", registryHandler.ListRepositories)
+			r.Get("/registry/repositories/{name}/tags", registryHandler.ListTags)
+			r.Get("/registry/catalog", registryHandler.ListRepositoriesWithTags)
+		}
 		r.Get("/containers", containersHandler.List)
 		r.Post("/containers/{id}/stop", containersHandler.Stop)
 		r.Post("/containers/{id}/start", containersHandler.Start)
+		r.Get("/images", imagesHandler.List)
 	})
 
 	// Start server
