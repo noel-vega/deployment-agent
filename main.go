@@ -10,6 +10,7 @@ import (
 	"github.com/noel-vega/deployment-agent/docker"
 	"github.com/noel-vega/deployment-agent/handlers"
 	"github.com/noel-vega/deployment-agent/middleware"
+	"github.com/noel-vega/deployment-agent/projects"
 	"github.com/noel-vega/deployment-agent/registry"
 )
 
@@ -41,9 +42,22 @@ func main() {
 		log.Printf("Registry endpoints will not be available")
 	}
 
+	// Initialize projects service
+	projectsService, err := projects.NewService(dockerService.Client())
+	if err != nil {
+		log.Printf("Warning: Failed to initialize projects service: %v", err)
+		log.Printf("Projects endpoints will not be available")
+	}
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler()
 	containersHandler := handlers.NewContainersHandler(dockerService)
+
+	// Initialize projects handler if projects service is available
+	var projectsHandler *handlers.ProjectsHandler
+	if projectsService != nil {
+		projectsHandler = handlers.NewProjectsHandler(projectsService)
+	}
 
 	// Initialize registry handler if registry client is available
 	var registryHandler *handlers.RegistryHandler
@@ -87,6 +101,12 @@ func main() {
 		r.Post("/containers/{id}/stop", containersHandler.Stop)
 		r.Post("/containers/{id}/start", containersHandler.Start)
 		r.Get("/images", imagesHandler.List)
+
+		// Projects endpoints (if projects service is configured)
+		if projectsHandler != nil {
+			r.Get("/projects", projectsHandler.List)
+			r.Get("/projects/{name}", projectsHandler.Get)
+		}
 	})
 
 	// Start server

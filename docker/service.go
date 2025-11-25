@@ -82,6 +82,10 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) Client() *client.Client {
+	return s.client
+}
+
 func (s *Service) StopContainer(ctx context.Context, containerID string) error {
 	if err := s.client.ContainerStop(ctx, containerID, container.StopOptions{}); err != nil {
 		return fmt.Errorf("failed to stop container: %w", err)
