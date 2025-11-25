@@ -106,6 +106,12 @@ func main() {
 		if projectsHandler != nil {
 			r.Get("/projects", projectsHandler.List)
 			r.Get("/projects/{name}", projectsHandler.Get)
+			r.Get("/projects/{name}/compose", projectsHandler.GetCompose)
+			r.Get("/projects/{name}/containers", projectsHandler.GetContainers)
+			r.Get("/projects/{name}/volumes", projectsHandler.GetVolumes)
+			r.Get("/projects/{name}/environment", projectsHandler.GetEnvironment)
+			r.Get("/projects/{name}/networks", projectsHandler.GetNetworks)
+			r.Get("/projects/{name}/services", projectsHandler.GetServices)
 		}
 	})
 
