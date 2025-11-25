@@ -15,10 +15,8 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o deployment-agent .
 
-# Final stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
+# Final stage - Use official Docker CLI image (includes compose plugin)
+FROM docker:27-cli
 
 WORKDIR /root/
 
