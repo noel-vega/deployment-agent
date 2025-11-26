@@ -45,9 +45,16 @@ type ProjectEnvironment struct {
 }
 
 type ProjectNetwork struct {
-	Name   string                 `json:"name"`
-	Driver string                 `json:"driver"`
-	Config map[string]interface{} `json:"config"`
+	Name   string         `json:"name"`
+	Driver string         `json:"driver"`
+	Config map[string]any `json:"config"`
+}
+
+type NetworkConfig struct {
+	Name     string                 `json:"name"`
+	External bool                   `json:"external"`
+	Driver   string                 `json:"driver,omitempty"`
+	Config   map[string]interface{} `json:"config,omitempty"`
 }
 
 type ComposeService struct {
@@ -810,7 +817,7 @@ func (s *Service) CreateProject(ctx context.Context, name string) error {
 	}
 
 	// Create project directory
-	if err := os.MkdirAll(projectPath, 0755); err != nil {
+	if err := os.MkdirAll(projectPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
 
@@ -826,7 +833,7 @@ func (s *Service) CreateProject(ctx context.Context, name string) error {
 		return fmt.Errorf("failed to marshal compose file: %w", err)
 	}
 
-	if err := os.WriteFile(composeFilePath, output, 0644); err != nil {
+	if err := os.WriteFile(composeFilePath, output, 0o644); err != nil {
 		return fmt.Errorf("failed to write compose file: %w", err)
 	}
 
@@ -980,6 +987,126 @@ func (s *Service) DeleteService(ctx context.Context, projectName, serviceName st
 	})
 }
 
+// AddNetwork adds a new network to a project
+func (s *Service) AddNetwork(ctx context.Context, projectName string, network NetworkConfig) error {
+	if network.Name == "" {
+		return fmt.Errorf("network name cannot be empty")
+	}
+
+	// Validate: external networks should not specify a driver
+	if network.External && network.Driver != "" {
+		return fmt.Errorf("external networks cannot specify a driver (driver is managed by the existing network)")
+	}
+
+	return s.updateComposeFile(projectName, func(compose *ComposeFile) error {
+		// Initialize networks map if needed
+		if compose.Networks == nil {
+			compose.Networks = make(map[string]interface{})
+		}
+
+		// Check if network already exists
+		if _, exists := compose.Networks[network.Name]; exists {
+			return fmt.Errorf("network already exists: %s", network.Name)
+		}
+
+		// Build network configuration
+		networkConfig := make(map[string]interface{})
+
+		if network.External {
+			networkConfig["external"] = true
+		}
+
+		if network.Driver != "" {
+			networkConfig["driver"] = network.Driver
+		}
+
+		// Merge any additional config
+		for k, v := range network.Config {
+			networkConfig[k] = v
+		}
+
+		// If no config specified, set to nil (minimal network definition)
+		if len(networkConfig) == 0 {
+			compose.Networks[network.Name] = nil
+		} else {
+			compose.Networks[network.Name] = networkConfig
+		}
+
+		return nil
+	})
+}
+
+// UpdateNetwork updates an existing network in a project
+func (s *Service) UpdateNetwork(ctx context.Context, projectName string, network NetworkConfig) error {
+	if network.Name == "" {
+		return fmt.Errorf("network name cannot be empty")
+	}
+
+	// Validate: external networks should not specify a driver
+	if network.External && network.Driver != "" {
+		return fmt.Errorf("external networks cannot specify a driver (driver is managed by the existing network)")
+	}
+
+	return s.updateComposeFile(projectName, func(compose *ComposeFile) error {
+		// Initialize networks map if needed
+		if compose.Networks == nil {
+			compose.Networks = make(map[string]interface{})
+		}
+
+		// Check if network exists
+		if _, exists := compose.Networks[network.Name]; !exists {
+			return fmt.Errorf("network not found: %s", network.Name)
+		}
+
+		// Build updated network configuration
+		networkConfig := make(map[string]interface{})
+
+		if network.External {
+			networkConfig["external"] = true
+		}
+
+		if network.Driver != "" {
+			networkConfig["driver"] = network.Driver
+		}
+
+		// Merge any additional config
+		for k, v := range network.Config {
+			networkConfig[k] = v
+		}
+
+		// If no config specified, set to nil (minimal network definition)
+		if len(networkConfig) == 0 {
+			compose.Networks[network.Name] = nil
+		} else {
+			compose.Networks[network.Name] = networkConfig
+		}
+
+		return nil
+	})
+}
+
+// DeleteNetwork removes a network from a project
+func (s *Service) DeleteNetwork(ctx context.Context, projectName, networkName string) error {
+	if networkName == "" {
+		return fmt.Errorf("network name cannot be empty")
+	}
+
+	return s.updateComposeFile(projectName, func(compose *ComposeFile) error {
+		// Check if networks map exists
+		if compose.Networks == nil {
+			return fmt.Errorf("network not found: %s", networkName)
+		}
+
+		// Check if network exists
+		if _, exists := compose.Networks[networkName]; !exists {
+			return fmt.Errorf("network not found: %s", networkName)
+		}
+
+		delete(compose.Networks, networkName)
+		return nil
+	})
+}
+
 // updateComposeFile is a helper function to safely update docker-compose.yml
 func (s *Service) updateComposeFile(projectName string, updateFn func(*ComposeFile) error) error {
 	projectPath := filepath.Join(s.rootPath, projectName)
@@ -1032,7 +1159,7 @@ func (s *Service) updateComposeFile(projectName string, updateFn func(*ComposeFi
 	}
 
 	// Write back to file
-	if err := os.WriteFile(composeFilePath, output, 0644); err != nil {
+	if err := os.WriteFile(composeFilePath, output, 0o644); err != nil {
 		return fmt.Errorf("failed to write compose file: %w", err)
 	}
 

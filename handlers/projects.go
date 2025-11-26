@@ -403,3 +403,127 @@ func (h *ProjectsHandler) DeleteService(w http.ResponseWriter, r *http.Request) 
 		"service": serviceName,
 	})
 }
+
+func (h *ProjectsHandler) AddNetwork(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectName := chi.URLParam(r, "name")
+
+	if projectName == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+
+	var network projects.NetworkConfig
+	if err := json.NewDecoder(r.Body).Decode(&network); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if network.Name == "" {
+		http.Error(w, "network name is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.projectsService.AddNetwork(ctx, projectName, network)
+	if err != nil {
+		if err.Error() == "network already exists: "+network.Name {
+			http.Error(w, err.Error(), http.StatusConflict)
+		} else if err.Error() == "project not found: "+projectName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else if err.Error() == "external networks cannot specify a driver (driver is managed by the existing network)" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "network added successfully",
+		"project": projectName,
+		"network": network.Name,
+	})
+}
+
+func (h *ProjectsHandler) UpdateNetwork(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectName := chi.URLParam(r, "name")
+	networkName := chi.URLParam(r, "network")
+
+	if projectName == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+
+	if networkName == "" {
+		http.Error(w, "network name is required", http.StatusBadRequest)
+		return
+	}
+
+	var network projects.NetworkConfig
+	if err := json.NewDecoder(r.Body).Decode(&network); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Use network name from URL
+	network.Name = networkName
+
+	err := h.projectsService.UpdateNetwork(ctx, projectName, network)
+	if err != nil {
+		if err.Error() == "network not found: "+networkName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else if err.Error() == "project not found: "+projectName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else if err.Error() == "external networks cannot specify a driver (driver is managed by the existing network)" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "network updated successfully",
+		"project": projectName,
+		"network": networkName,
+	})
+}
+
+func (h *ProjectsHandler) DeleteNetwork(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectName := chi.URLParam(r, "name")
+	networkName := chi.URLParam(r, "network")
+
+	if projectName == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+
+	if networkName == "" {
+		http.Error(w, "network name is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.projectsService.DeleteNetwork(ctx, projectName, networkName)
+	if err != nil {
+		if err.Error() == "network not found: "+networkName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else if err.Error() == "project not found: "+projectName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "network deleted successfully",
+		"project": projectName,
+		"network": networkName,
+	})
+}

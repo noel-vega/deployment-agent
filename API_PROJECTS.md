@@ -5,10 +5,11 @@ APIs for creating and managing Docker Compose projects through a UI form workflo
 
 ## Workflow
 1. Create a new project (empty docker-compose.yml with just `services: {}`)
-2. Add services to the project via UI form
-3. Update services as needed
-4. Delete services when no longer needed
-5. Start/stop services using existing endpoints
+2. Add networks to the project (optional, e.g., external Traefik network)
+3. Add services to the project via UI form
+4. Update services and networks as needed
+5. Delete services or networks when no longer needed
+6. Start/stop services using existing endpoints
 
 **Note:** The `version` field is obsolete in Docker Compose v2 and is intentionally omitted to avoid deprecation warnings.
 
@@ -155,6 +156,104 @@ DELETE /projects/{name}/services/{service}
 
 ---
 
+### Add Network to Project
+Add a new network definition to an existing project.
+
+```http
+POST /projects/{name}/networks
+Content-Type: application/json
+
+{
+  "name": "infra",
+  "external": true
+}
+```
+
+**Available Fields:**
+- `name` (required) - Network name
+- `external` - Boolean, whether network is externally managed
+- `driver` - Network driver (e.g., `bridge`, `overlay`) - **Cannot be used with `external: true`**
+- `config` - Additional network configuration as key-value map
+
+**Validation Rules:**
+- External networks (`external: true`) cannot specify a `driver` (the driver is managed by the existing network)
+- Only one of `external` or `driver` should be specified
+
+**Response (201 Created):**
+```json
+{
+  "message": "network added successfully",
+  "project": "my-app",
+  "network": "infra"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` - Invalid request, missing network name, or external network with driver specified
+- `404 Not Found` - Project not found
+- `409 Conflict` - Network already exists
+- `500 Internal Server Error` - Server error
+
+---
+
+### Update Network
+Update an existing network in a project.
+
+```http
+PUT /projects/{name}/networks/{network}
+Content-Type: application/json
+
+{
+  "external": false,
+  "driver": "bridge"
+}
+```
+
+**Note:** The network name comes from the URL. All fields are optional - only provide fields you want to update.
+
+**Validation Rules:**
+- External networks (`external: true`) cannot specify a `driver`
+- Only one of `external` or `driver` should be specified
+
+**Response (200 OK):**
+```json
+{
+  "message": "network updated successfully",
+  "project": "my-app",
+  "network": "infra"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` - Invalid request or external network with driver specified
+- `404 Not Found` - Project or network not found
+- `500 Internal Server Error` - Server error
+
+---
+
+### Delete Network
+Remove a network from a project.
+
+```http
+DELETE /projects/{name}/networks/{network}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "network deleted successfully",
+  "project": "my-app",
+  "network": "infra"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` - Invalid request
+- `404 Not Found` - Project or network not found
+- `500 Internal Server Error` - Server error
+
+---
+
 ## Example: Complete Workflow
 
 ### 1. Create Project
@@ -225,7 +324,18 @@ curl -X DELETE http://localhost:5000/projects/my-app/services/web \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-### 8. Add Service with Traefik Labels
+### 8. Add External Network (for Traefik)
+```bash
+curl -X POST http://localhost:5000/projects/my-app/networks \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
+    "name": "infra",
+    "external": true
+  }'
+```
+
+### 9. Add Service with Traefik Labels
 ```bash
 curl -X POST http://localhost:5000/projects/my-app/services \
   -H "Content-Type: application/json" \
@@ -249,6 +359,33 @@ curl -X POST http://localhost:5000/projects/my-app/services \
 
 This creates a service that Traefik will automatically expose at `https://blog.noelvega.dev` with Let's Encrypt SSL certificate.
 
+### 10. Create Custom Bridge Network
+```bash
+curl -X POST http://localhost:5000/projects/my-app/networks \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
+    "name": "backend",
+    "driver": "bridge"
+  }'
+```
+
+### 11. Update Network Configuration
+```bash
+curl -X PUT http://localhost:5000/projects/my-app/networks/backend \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
+    "driver": "overlay"
+  }'
+```
+
+### 12. Delete Network
+```bash
+curl -X DELETE http://localhost:5000/projects/my-app/networks/backend \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
 ## Technical Notes
 
 ### docker-compose.yml Structure
@@ -259,12 +396,16 @@ services:
     image: nginx:latest
     ports:
       - 80:80
+    networks:
+      - infra
   db:
     image: postgres:14
     environment:
       POSTGRES_PASSWORD: secret
-networks: {}  # Preserved if exists
-volumes: {}   # Preserved if exists
+networks:
+  infra:
+    external: true
+volumes: {}  # Preserved if exists
 ```
 
 **Note:** The `version` field is obsolete in Docker Compose v2 (as of 2020+) and is intentionally omitted to avoid deprecation warnings.
