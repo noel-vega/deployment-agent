@@ -152,7 +152,8 @@ REGISTRY_PASSWORD=
 |----------|----------|---------|-------------|
 | `HUBBLE_REGISTRY_ENABLED` | No | `true` | Enable built-in Docker registry |
 | `HUBBLE_REGISTRY_DELETE_ENABLED` | No | `true` | Allow image deletion |
-| `HUBBLE_REGISTRY_STORAGE` | No | `/var/lib/hubble/registry` | Image storage path |
+
+**Note:** Registry data is stored in Docker-managed volumes (`hubble-registry-data` and `hubble-registry-auth`). No manual directory setup required!
 
 ### External Registry (Optional)
 

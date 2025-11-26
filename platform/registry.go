@@ -130,19 +130,9 @@ func EnsureRegistry(dockerClient *client.Client, config RegistryConfig) error {
 func createRegistryContainer(dockerClient *client.Client, config RegistryConfig) error {
 	ctx := context.Background()
 
-	// Ensure storage directory exists
-	if err := os.MkdirAll(config.StoragePath, 0755); err != nil {
-		return fmt.Errorf("failed to create Registry storage directory: %w", err)
-	}
-
-	// Ensure auth directory exists
-	if err := os.MkdirAll(config.AuthPath, 0755); err != nil {
-		return fmt.Errorf("failed to create Registry auth directory: %w", err)
-	}
-
-	// Create htpasswd file for authentication
-	htpasswdPath := filepath.Join(config.AuthPath, "htpasswd")
-	if err := createHtpasswdFile(htpasswdPath); err != nil {
+	// Create htpasswd file in the Docker volume
+	log.Println("Creating htpasswd file in Docker volume...")
+	if err := createHtpasswdFileInVolume(); err != nil {
 		return fmt.Errorf("failed to create htpasswd file: %w", err)
 	}
 
@@ -202,13 +192,13 @@ func createRegistryContainer(dockerClient *client.Client, config RegistryConfig)
 		PortBindings: portBindings,
 		Mounts: []mount.Mount{
 			{
-				Type:   mount.TypeBind,
-				Source: config.StoragePath,
+				Type:   mount.TypeVolume,
+				Source: "hubble-registry-data",
 				Target: "/var/lib/registry",
 			},
 			{
-				Type:     mount.TypeBind,
-				Source:   config.AuthPath,
+				Type:     mount.TypeVolume,
+				Source:   "hubble-registry-auth",
 				Target:   "/auth",
 				ReadOnly: true,
 			},
@@ -250,8 +240,8 @@ func createRegistryContainer(dockerClient *client.Client, config RegistryConfig)
 	return nil
 }
 
-// createHtpasswdFile creates an htpasswd file using Hubble's admin credentials
-func createHtpasswdFile(path string) error {
+// createHtpasswdFileInVolume creates an htpasswd file in the Docker volume
+func createHtpasswdFileInVolume() error {
 	username := os.Getenv("ADMIN_USERNAME")
 	password := os.Getenv("ADMIN_PASSWORD")
 
@@ -259,27 +249,20 @@ func createHtpasswdFile(path string) error {
 		return fmt.Errorf("ADMIN_USERNAME and ADMIN_PASSWORD must be set")
 	}
 
-	// Use htpasswd command if available, otherwise use Docker
-	if _, err := exec.LookPath("htpasswd"); err == nil {
-		// Use system htpasswd
-		cmd := exec.Command("htpasswd", "-Bbn", username, password)
-		output, err := cmd.Output()
-		if err != nil {
-			return fmt.Errorf("htpasswd command failed: %w", err)
-		}
-		return os.WriteFile(path, output, 0644)
-	}
-
-	// Fallback: Use Docker to run httpd:alpine with htpasswd
-	log.Println("htpasswd not found, using Docker to generate auth file...")
+	// Use Docker to generate htpasswd and write directly to the volume
+	// Mount the volume and run htpasswd command to create the file
 	cmd := exec.Command("docker", "run", "--rm",
+		"-v", "hubble-registry-auth:/auth",
 		"httpd:alpine",
-		"htpasswd", "-Bbn", username, password,
+		"sh", "-c",
+		fmt.Sprintf("htpasswd -Bbn %s %s > /auth/htpasswd", username, password),
 	)
-	output, err := cmd.Output()
+
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to generate htpasswd via Docker: %w", err)
+		return fmt.Errorf("failed to create htpasswd in volume: %w, output: %s", err, string(output))
 	}
 
-	return os.WriteFile(path, output, 0644)
+	log.Println("✓ htpasswd file created in Docker volume")
+	return nil
 }

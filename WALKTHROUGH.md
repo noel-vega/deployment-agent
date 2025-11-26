@@ -567,18 +567,37 @@ See [API.md](API.md) for complete API documentation:
 
 ### Backup Your Data
 
-```bash
-# Backup registry images
-sudo tar -czf hubble-registry-backup.tar.gz /var/lib/hubble/registry
+Hubble uses Docker volumes for persistent storage. Backup using these commands:
 
-# Backup Traefik certificates
-sudo tar -czf hubble-traefik-backup.tar.gz /var/lib/hubble/traefik
+```bash
+# Backup registry data
+docker run --rm -v hubble-registry-data:/data -v $(pwd):/backup alpine \
+  tar czf /backup/hubble-registry-backup.tar.gz -C /data .
+
+# Backup registry auth
+docker run --rm -v hubble-registry-auth:/data -v $(pwd):/backup alpine \
+  tar czf /backup/hubble-registry-auth-backup.tar.gz -C /data .
+
+# Backup Traefik data (certificates)
+docker run --rm -v hubble-traefik-data:/data -v $(pwd):/backup alpine \
+  tar czf /backup/hubble-traefik-backup.tar.gz -C /data .
 
 # Backup projects
-tar -czf hubble-projects-backup.tar.gz /projects
+docker run --rm -v hubble-projects:/data -v $(pwd):/backup alpine \
+  tar czf /backup/hubble-projects-backup.tar.gz -C /data .
 
 # Backup environment
 cp .env .env.backup
+```
+
+**Restore from backup:**
+
+```bash
+# Restore registry data
+docker run --rm -v hubble-registry-data:/data -v $(pwd):/backup alpine \
+  tar xzf /backup/hubble-registry-backup.tar.gz -C /data
+
+# Restore other volumes similarly
 ```
 
 ---

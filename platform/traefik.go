@@ -90,18 +90,8 @@ func EnsureTraefik(dockerClient *client.Client, config TraefikConfig) error {
 func createTraefikContainer(dockerClient *client.Client, config TraefikConfig) error {
 	ctx := context.Background()
 
-	// Ensure data directory exists
-	if err := os.MkdirAll(TraefikDataPath, 0755); err != nil {
-		return fmt.Errorf("failed to create Traefik data directory: %w", err)
-	}
-
-	// Create acme.json with correct permissions if it doesn't exist
-	acmeFile := TraefikDataPath + "/acme.json"
-	if _, err := os.Stat(acmeFile); os.IsNotExist(err) {
-		if err := os.WriteFile(acmeFile, []byte{}, 0600); err != nil {
-			return fmt.Errorf("failed to create acme.json: %w", err)
-		}
-	}
+	// Docker volumes handle storage automatically - no manual directory creation needed
+	log.Println("Using Docker volume for Traefik data storage")
 
 	// Build Traefik command arguments
 	cmd := []string{
@@ -185,8 +175,8 @@ func createTraefikContainer(dockerClient *client.Client, config TraefikConfig) e
 				ReadOnly: true,
 			},
 			{
-				Type:   mount.TypeBind,
-				Source: TraefikDataPath,
+				Type:   mount.TypeVolume,
+				Source: "hubble-traefik-data",
 				Target: "/data",
 			},
 		},

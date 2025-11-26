@@ -9,7 +9,11 @@ services:
       - "3000:5000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /projects:/projects
+      - hubble-projects:/projects
+      # Mount Docker volumes so hubble-server can create containers that use them
+      - hubble-traefik-data:/var/lib/hubble/traefik
+      - hubble-registry-data:/var/lib/hubble/registry
+      - hubble-registry-auth:/var/lib/hubble/registry-auth
     environment:
       - LOG_LEVEL=info
       - ENVIRONMENT=${ENVIRONMENT:-development}
@@ -27,9 +31,24 @@ services:
       - HUBBLE_TRAEFIK_DASHBOARD_AUTH=${HUBBLE_TRAEFIK_DASHBOARD_AUTH}
       - HUBBLE_REGISTRY_ENABLED=${HUBBLE_REGISTRY_ENABLED:-true}
       - HUBBLE_REGISTRY_DELETE_ENABLED=${HUBBLE_REGISTRY_DELETE_ENABLED:-true}
-      - HUBBLE_REGISTRY_STORAGE=${HUBBLE_REGISTRY_STORAGE:-/var/lib/hubble/registry}
+      - HUBBLE_REGISTRY_STORAGE=/var/lib/hubble/registry
     networks:
       - hubble
+
+volumes:
+  # Docker-managed volumes - no permission issues!
+  hubble-traefik-data:
+    name: hubble-traefik-data
+    driver: local
+  hubble-registry-data:
+    name: hubble-registry-data
+    driver: local
+  hubble-registry-auth:
+    name: hubble-registry-auth
+    driver: local
+  hubble-projects:
+    name: hubble-projects
+    driver: local
 
 networks:
   hubble:

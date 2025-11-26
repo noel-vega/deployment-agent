@@ -8,6 +8,7 @@ Hubble is a production-ready platform for managing Docker containers and Compose
 
 - **Auto-provisioned Infrastructure** - Network, Traefik, and Registry automatically created on startup
 - **Built-in Docker Registry** - Private image storage with automatic HTTPS (enabled by default)
+- **Docker Volume Management** - Persistent storage with zero permission issues
 - **Project Management API** - Create and manage Docker Compose projects via REST API
 - **Traefik Integration** - Automatic HTTPS and routing with Let's Encrypt
 - **Secure Authentication** - JWT-based auth with refresh token rotation
@@ -142,6 +143,21 @@ Internet → Traefik → Hubble Network
     hubble-server  hubble-registry  user projects
          (API)      (Images)        (Apps)
 ```
+
+### Persistent Storage
+
+Hubble uses Docker-managed volumes for all persistent data:
+
+- `hubble-registry-data` - Docker images and layers
+- `hubble-registry-auth` - Registry authentication
+- `hubble-traefik-data` - Traefik configuration and SSL certificates
+- `hubble-projects` - Docker Compose project files
+
+**Benefits:**
+- ✅ Zero permission issues - Docker handles all access
+- ✅ No manual setup required
+- ✅ Easy backup and restore
+- ✅ Portable across systems
 
 ## Use Cases
 
