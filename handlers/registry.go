@@ -30,6 +30,7 @@ func (h *RegistryHandler) ListRepositories(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
+		"registry":     h.registryClient.GetRegistryURL(),
 		"repositories": repositories,
 		"count":        len(repositories),
 	})
@@ -53,6 +54,7 @@ func (h *RegistryHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
+		"registry":   h.registryClient.GetRegistryURL(),
 		"repository": repoName,
 		"tags":       tags,
 		"count":      len(tags),
@@ -71,6 +73,7 @@ func (h *RegistryHandler) ListRepositoriesWithTags(w http.ResponseWriter, r *htt
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
+		"registry":     h.registryClient.GetRegistryURL(),
 		"repositories": repositories,
 		"count":        len(repositories),
 	})

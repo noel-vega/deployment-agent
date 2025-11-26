@@ -451,6 +451,7 @@ func (s *Service) GetProjectServices(ctx context.Context, projectName string) ([
 				Volumes:     []string{},
 				DependsOn:   []string{},
 				Networks:    []string{},
+				Labels:      []string{},
 				Status:      "not_created", // Default status
 			}
 

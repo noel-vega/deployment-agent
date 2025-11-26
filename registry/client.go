@@ -166,3 +166,8 @@ func (c *Client) Close() error {
 	// HTTP client doesn't need explicit closing
 	return nil
 }
+
+// GetRegistryURL returns the base URL of the registry
+func (c *Client) GetRegistryURL() string {
+	return c.baseURL
+}
