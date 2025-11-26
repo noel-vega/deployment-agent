@@ -54,6 +54,71 @@ services:
       - "traefik.http.routers.hubble-web.priority=1"
       - "traefik.http.services.hubble-web.loadbalancer.server.port=80"
 
+  hubble-traefik:
+    image: traefik:v3.0
+    container_name: hubble-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:8080"  # Dashboard (localhost only)
+    command:
+      - --providers.docker=true
+      - --providers.docker.network=hubble
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.email=${HUBBLE_TRAEFIK_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --api.dashboard=${HUBBLE_TRAEFIK_DASHBOARD:-false}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - hubble-traefik-data:/data
+    networks:
+      - hubble
+    labels:
+      com.hubble.managed: "true"
+      com.hubble.service: "traefik"
+
+  registry-init:
+    image: httpd:alpine
+    container_name: registry-init
+    command: >
+      sh -c "htpasswd -Bbn ${ADMIN_USERNAME} ${ADMIN_PASSWORD} > /auth/htpasswd && 
+             chmod 644 /auth/htpasswd && 
+             echo '✓ Registry auth configured'"
+    volumes:
+      - hubble-registry-auth:/auth
+
+  hubble-registry:
+    image: registry:2
+    container_name: hubble-registry
+    restart: unless-stopped
+    depends_on:
+      registry-init:
+        condition: service_completed_successfully
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=Hubble Registry
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+      - REGISTRY_STORAGE_DELETE_ENABLED=${HUBBLE_REGISTRY_DELETE_ENABLED:-true}
+    volumes:
+      - hubble-registry-data:/var/lib/registry
+      - hubble-registry-auth:/auth
+    networks:
+      - hubble
+    labels:
+      com.hubble.managed: "true"
+      com.hubble.service: "registry"
+      traefik.enable: "true"
+      traefik.http.routers.registry.rule: "Host(`registry.${HUBBLE_DOMAIN:-localhost}`)"
+      traefik.http.routers.registry.entrypoints: "websecure"
+      traefik.http.routers.registry.tls.certresolver: "letsencrypt"
+      traefik.http.services.registry.loadbalancer.server.port: "5000"
+
 volumes:
   # Docker-managed volumes - no permission issues!
   hubble-traefik-data:
