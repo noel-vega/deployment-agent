@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/noel-vega/deployment-agent/auth"
+	"github.com/noel-vega/hubble/auth"
 )
 
 // Protected is a middleware that validates JWT access tokens from cookies

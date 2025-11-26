@@ -1,12 +1,14 @@
-module github.com/noel-vega/deployment-agent
+module github.com/noel-vega/hubble
 
 go 1.24.0
 
 require (
 	github.com/docker/docker v28.3.2+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-chi/jwtauth/v5 v5.3.3
 	golang.org/x/crypto v0.45.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -16,7 +18,6 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -50,6 +51,5 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/grpc v1.73.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 )

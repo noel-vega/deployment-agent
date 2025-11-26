@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/noel-vega/deployment-agent/auth"
-	"github.com/noel-vega/deployment-agent/middleware"
+	"github.com/noel-vega/hubble/auth"
+	"github.com/noel-vega/hubble/middleware"
 )
 
 type AuthHandler struct{}

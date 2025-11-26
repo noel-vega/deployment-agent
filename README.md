@@ -1,163 +1,229 @@
-# Hubble - Docker Container Dashboard
+# Hubble
 
-A secure, production-ready API for monitoring Docker containers with JWT authentication.
+**The complete self-hosted Docker platform with auto-provisioned infrastructure.**
 
-## Quick Start
-
-### Development (Easiest)
-
-```bash
-# Start development server with hot reload
-make dev
-
-# Server runs at http://localhost:5000
-# Default credentials: admin / devpass123
-```
-
-The `make dev` command automatically sets up development environment variables and runs with hot reload using air.
-
-### Production Setup
-
-#### 1. Set Required Environment Variables
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and configure:
-
-```bash
-# REQUIRED - Application will not start without these
-ADMIN_USERNAME=your-admin-username
-ADMIN_PASSWORD=your-secure-password  # minimum 8 characters
-
-# REQUIRED for production - Generate strong random secrets
-JWT_ACCESS_SECRET=$(openssl rand -base64 32)
-JWT_REFRESH_SECRET=$(openssl rand -base64 32)
-
-# Optional - Configure token durations
-ACCESS_TOKEN_DURATION=5m
-REFRESH_TOKEN_DURATION=168h
-
-# Set to production for HTTPS-only cookies
-ENVIRONMENT=production
-```
-
-#### 2. Run the Application
-
-```bash
-# Build and run
-make build
-make run
-
-# Or manually
-go build -o hubble .
-ENVIRONMENT=production ./hubble
-```
-
-### 3. Authentication
-
-Login to get JWT tokens:
-
-```bash
-curl -X POST http://localhost:5000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"your-admin-username","password":"your-password"}' \
-  -c cookies.txt
-```
-
-Access protected endpoints:
-
-```bash
-curl http://localhost:5000/containers -b cookies.txt
-```
+Hubble is a production-ready platform for managing Docker containers and Compose projects. Deploy apps with automatic HTTPS, store images in your own registry, and manage everything through a simple REST API.
 
 ## Features
 
-✅ **Secure JWT Authentication** with short-lived access tokens (5 min) and refresh token rotation  
-✅ **httpOnly Cookies** - XSS protection  
-✅ **Bcrypt Password Hashing** - Industry-standard security  
-✅ **Server-side Session Tracking** - Revocable sessions  
-✅ **Environment-based Configuration** - No hardcoded secrets  
-✅ **Production-ready** - HTTPS support, secure cookies  
+- **Auto-provisioned Infrastructure** - Network, Traefik, and Registry automatically created on startup
+- **Built-in Docker Registry** - Private image storage with automatic HTTPS (enabled by default)
+- **Project Management API** - Create and manage Docker Compose projects via REST API
+- **Traefik Integration** - Automatic HTTPS and routing with Let's Encrypt
+- **Secure Authentication** - JWT-based auth with refresh token rotation
+- **Container Monitoring** - List, start, stop, and inspect containers
+- **Zero Configuration** - Just works out of the box
 
-## API Endpoints
+## Quick Start
 
-### Authentication
-- `POST /auth/login` - Login and receive tokens
-- `POST /auth/refresh` - Refresh expired access token
-- `POST /auth/logout` - Logout and clear tokens
+**New to Hubble?** Follow our [**step-by-step walkthrough**](WALKTHROUGH.md) for a complete guided setup (30 minutes).
 
-### Protected Endpoints
-- `GET /containers` - List Docker containers (requires authentication)
+### 1. Clone and Configure
+
+```bash
+git clone https://github.com/noel-vega/hubble
+cd hubble
+cp .env.example .env
+```
+
+Edit `.env` and set required values:
+
+```bash
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-password
+JWT_ACCESS_SECRET=$(openssl rand -base64 32)
+JWT_REFRESH_SECRET=$(openssl rand -base64 32)
+
+# For production with HTTPS
+HUBBLE_DOMAIN=yourdomain.com
+HUBBLE_TRAEFIK_ENABLED=true
+HUBBLE_TRAEFIK_EMAIL=admin@yourdomain.com
+```
+
+### 2. Start Hubble
+
+```bash
+# Using Docker Compose (recommended)
+docker-compose up -d
+
+# Or build and run locally
+make build
+make run
+```
+
+Hubble will automatically:
+- ✅ Create the `hubble` Docker network
+- ✅ Start the API server on port 3000
+- ✅ Start the Docker Registry (enabled by default)
+- ✅ Optionally start Traefik for HTTPS (if `HUBBLE_TRAEFIK_ENABLED=true`)
+
+### 3. Login
+
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"your-secure-password"}' \
+  -c cookies.txt
+```
+
+### 4. Create a Project
+
+```bash
+curl -X POST http://localhost:3000/projects \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{"name":"my-blog"}'
+```
+
+### 5. Add a Service
+
+```bash
+curl -X POST http://localhost:3000/projects/my-blog/services \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "name": "web",
+    "image": "nginx:alpine",
+    "ports": ["80:80"],
+    "restart": "unless-stopped"
+  }'
+```
+
+## What is Hubble?
+
+Hubble is a **complete platform** for self-hosted Docker infrastructure. It provides:
+
+### Infrastructure as Code
+- Automatically creates a shared `hubble` Docker network
+- Auto-provisions Docker Registry for private image storage
+- Optionally provisions Traefik reverse proxy
+- All managed services are labeled with `com.hubble.managed=true`
+
+### Built-in Registry
+- Private Docker registry at `registry.yourdomain.com`
+- Automatic HTTPS via Let's Encrypt (when Traefik enabled)
+- Uses your Hubble admin credentials
+- Store unlimited images on your infrastructure
+
+### Project Management
+- Create Docker Compose projects via API
+- Add/update/delete services and networks
+- Start/stop services individually or as a group
+- All projects stored in `/projects` directory
+
+### Zero-Config Networking
+- All projects automatically connect to the `hubble` network
+- Registry and Traefik integrated seamlessly
+- No manual network or infrastructure commands needed
+
+### Complete Workflow
+```bash
+# 1. Build your app
+docker build -t myapp .
+
+# 2. Push to Hubble registry
+docker tag myapp registry.yourdomain.com/myapp
+docker push registry.yourdomain.com/myapp
+
+# 3. Deploy via API
+curl -X POST /projects/myapp/services \
+  -d '{"name":"web","image":"registry.yourdomain.com/myapp"}'
+
+# 4. Access at myapp.yourdomain.com (via Traefik)
+```
+
+## Architecture
+
+```
+Internet → Traefik → Hubble Network
+                          ↓
+           ┌──────────────┼──────────────┐
+           ↓              ↓              ↓
+    hubble-server  hubble-registry  user projects
+         (API)      (Images)        (Apps)
+```
+
+## Use Cases
+
+- **Complete Self-Hosted Platform** - Everything you need: API, registry, routing, HTTPS
+- **Private Image Storage** - No Docker Hub rate limits, full control of your images
+- **Dev/Staging Environment** - Quick project setup with built-in infrastructure
+- **Learning Docker** - REST API for Docker Compose operations
+- **Automated Deployments** - API-driven infrastructure with built-in registry
 
 ## Documentation
 
-- **[AUTH_GUIDE.md](AUTH_GUIDE.md)** - Complete authentication documentation
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Technical implementation details
-- **[.env.example](.env.example)** - Environment configuration template
-
-## Security
-
-This application implements Azure-inspired authentication with:
-- Short-lived access tokens (5 minutes)
-- Long-lived refresh tokens (7 days)
-- Token rotation on refresh
-- Server-side session management
-- Minimum 8-character password requirement
-- No default credentials (fail-safe)
+- **[WALKTHROUGH.md](WALKTHROUGH.md)** - 🎯 **START HERE!** Step-by-step guide for new users
+- **[SETUP.md](SETUP.md)** - Installation, configuration, and deployment
+- **[API.md](API.md)** - Complete API reference
+- **[TRAEFIK.md](TRAEFIK.md)** - Traefik integration and examples
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development workflow and testing
 
 ## Requirements
 
-- Go 1.24+
-- Docker (for container monitoring)
-- Environment variables for admin credentials
+- Docker 20.10+
+- Docker Compose v2+
+- Go 1.24+ (for local development)
+- Linux host (recommended) or macOS
 
-## Available Make Commands
-
-```bash
-make help          # Show all available commands
-make dev           # Run development server with hot reload
-make build         # Build the application
-make run           # Build and run
-make test          # Run tests
-make test-auth     # Test authentication flow (requires running server)
-make clean         # Clean build artifacts
-make deps          # Install dependencies
-make hash          # Generate bcrypt password hash
-make docker-build  # Build Docker image
-make docker-run    # Run with docker-compose
-make docker-stop   # Stop Docker container
-```
-
-## Development Workflow
+## Quick Commands
 
 ```bash
-# 1. Start dev server with hot reload
-make dev
+# Development
+make dev                # Start with hot reload
+make test-auth          # Test authentication flow
 
-# 2. Make changes to code - server auto-restarts
+# Building
+make build              # Build binary
+make docker-build       # Build Docker image
 
-# 3. Test authentication in another terminal
-make test-auth
-
-# 4. Generate password hashes if needed
-make hash PASSWORD=mynewpassword
+# Deployment
+docker-compose up -d    # Start with Docker Compose
+docker-compose logs -f  # View logs
+docker-compose down     # Stop everything
 ```
 
-## Testing
+## Security
+
+- ✅ JWT authentication with httpOnly cookies
+- ✅ Bcrypt password hashing
+- ✅ Token rotation on refresh
+- ✅ HTTPS enforcement in production
+- ✅ Minimum 8-character passwords
+- ✅ No default credentials
+
+## Environment Variables
+
+Key environment variables:
 
 ```bash
-# With make (recommended)
-make dev  # Start server in one terminal
-make test-auth  # Run auth tests in another terminal
+# Authentication (required)
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-password
+JWT_ACCESS_SECRET=random-secret-32-chars
+JWT_REFRESH_SECRET=different-random-secret
 
-# Manual testing
-export ADMIN_USERNAME=admin
-export ADMIN_PASSWORD=devpass123
-./test_auth.sh
+# Platform Domain (for HTTPS access to registry and Traefik)
+HUBBLE_DOMAIN=yourdomain.com
+
+# Registry (enabled by default)
+HUBBLE_REGISTRY_ENABLED=true
+HUBBLE_REGISTRY_DELETE_ENABLED=true
+
+# Traefik (optional, recommended for production)
+HUBBLE_TRAEFIK_ENABLED=false
+HUBBLE_TRAEFIK_EMAIL=admin@example.com
+
+# Projects
+PROJECTS_ROOT_PATH=/projects
 ```
+
+See [SETUP.md](SETUP.md) for complete configuration details.
 
 ## License
 
 MIT
+
+## Contributing
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for development setup and guidelines.

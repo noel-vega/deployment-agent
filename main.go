@@ -6,12 +6,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/noel-vega/deployment-agent/auth"
-	"github.com/noel-vega/deployment-agent/docker"
-	"github.com/noel-vega/deployment-agent/handlers"
-	"github.com/noel-vega/deployment-agent/middleware"
-	"github.com/noel-vega/deployment-agent/projects"
-	"github.com/noel-vega/deployment-agent/registry"
+	"github.com/noel-vega/hubble/auth"
+	"github.com/noel-vega/hubble/docker"
+	"github.com/noel-vega/hubble/handlers"
+	"github.com/noel-vega/hubble/middleware"
+	"github.com/noel-vega/hubble/platform"
+	"github.com/noel-vega/hubble/projects"
+	"github.com/noel-vega/hubble/registry"
 )
 
 func main() {
@@ -34,6 +35,12 @@ func main() {
 		log.Fatalf("Failed to initialize docker service: %v", err)
 	}
 	defer dockerService.Close()
+
+	// Ensure Hubble infrastructure (networks, etc.) is set up
+	log.Println("Setting up Hubble infrastructure...")
+	if err := platform.EnsureInfrastructure(dockerService.Client()); err != nil {
+		log.Fatalf("Failed to set up Hubble infrastructure: %v", err)
+	}
 
 	// Initialize registry client
 	registryClient, err := registry.NewClient()
@@ -74,7 +81,7 @@ func main() {
 
 	// Public routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("deployment-agent"))
+		w.Write([]byte("hubble"))
 	})
 
 	// Auth routes (public)

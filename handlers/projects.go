@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/noel-vega/deployment-agent/projects"
+	"github.com/noel-vega/hubble/projects"
 )
 
 type ProjectsHandler struct {

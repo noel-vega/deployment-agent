@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  deployment-agent:
+  hubble-server:
     build: .
-    container_name: deployment-agent
+    container_name: hubble-server 
     restart: unless-stopped
     ports:
       - "3000:5000"
@@ -12,4 +12,29 @@ services:
       - /projects:/projects
     environment:
       - LOG_LEVEL=info
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - ACCESS_TOKEN_DURATION=${ACCESS_TOKEN_DURATION:-5m}
+      - REFRESH_TOKEN_DURATION=${REFRESH_TOKEN_DURATION:-168h}
       - PROJECTS_ROOT_PATH=/projects
+      - HUBBLE_DOMAIN=${HUBBLE_DOMAIN}
+      - HUBBLE_TRAEFIK_ENABLED=${HUBBLE_TRAEFIK_ENABLED:-false}
+      - HUBBLE_TRAEFIK_EMAIL=${HUBBLE_TRAEFIK_EMAIL}
+      - HUBBLE_TRAEFIK_DASHBOARD=${HUBBLE_TRAEFIK_DASHBOARD:-false}
+      - HUBBLE_TRAEFIK_DASHBOARD_AUTH=${HUBBLE_TRAEFIK_DASHBOARD_AUTH}
+      - HUBBLE_REGISTRY_ENABLED=${HUBBLE_REGISTRY_ENABLED:-true}
+      - HUBBLE_REGISTRY_DELETE_ENABLED=${HUBBLE_REGISTRY_DELETE_ENABLED:-true}
+      - HUBBLE_REGISTRY_STORAGE=${HUBBLE_REGISTRY_STORAGE:-/var/lib/hubble/registry}
+    networks:
+      - hubble
+
+networks:
+  hubble:
+    name: hubble
+    driver: bridge
+    labels:
+      com.hubble.managed: "true"
+      com.hubble.network: "platform"

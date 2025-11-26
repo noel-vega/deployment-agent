@@ -1,1 +1,22 @@
 tmp
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local testing artifacts
+hubble-server
+deployment-agent
+TESTING_SUMMARY.md
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work

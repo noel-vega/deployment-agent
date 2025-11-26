@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/noel-vega/deployment-agent/docker"
+	"github.com/noel-vega/hubble/docker"
 )
 
 type ImagesHandler struct {
