@@ -3,11 +3,13 @@ package platform
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -89,6 +91,11 @@ func EnsureTraefik(dockerClient *client.Client, config TraefikConfig) error {
 
 func createTraefikContainer(dockerClient *client.Client, config TraefikConfig) error {
 	ctx := context.Background()
+
+	// Ensure Traefik image is available
+	if err := ensureImageAvailable(dockerClient, TraefikImage); err != nil {
+		return fmt.Errorf("failed to ensure Traefik image is available: %w", err)
+	}
 
 	// Docker volumes handle storage automatically - no manual directory creation needed
 	log.Println("Using Docker volume for Traefik data storage")
@@ -214,5 +221,40 @@ func createTraefikContainer(dockerClient *client.Client, config TraefikConfig) e
 	log.Println("  HTTP: http://0.0.0.0:80")
 	log.Println("  HTTPS: https://0.0.0.0:443")
 
+	return nil
+}
+
+// ensureImageAvailable checks if a Docker image exists locally, and pulls it if not
+func ensureImageAvailable(dockerClient *client.Client, imageName string) error {
+	ctx := context.Background()
+
+	// Check if image exists locally
+	images, err := dockerClient.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", imageName)),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list images: %w", err)
+	}
+
+	// Image already exists
+	if len(images) > 0 {
+		log.Printf("✓ Image %s already available locally", imageName)
+		return nil
+	}
+
+	// Image doesn't exist, pull it
+	log.Printf("Pulling image %s...", imageName)
+	reader, err := dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to pull image %s: %w", imageName, err)
+	}
+	defer reader.Close()
+
+	// Read the output to ensure pull completes
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		return fmt.Errorf("failed to read pull output: %w", err)
+	}
+
+	log.Printf("✓ Successfully pulled image %s", imageName)
 	return nil
 }

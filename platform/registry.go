@@ -130,6 +130,11 @@ func EnsureRegistry(dockerClient *client.Client, config RegistryConfig) error {
 func createRegistryContainer(dockerClient *client.Client, config RegistryConfig) error {
 	ctx := context.Background()
 
+	// Ensure Registry image is available
+	if err := ensureImageAvailable(dockerClient, RegistryImage); err != nil {
+		return fmt.Errorf("failed to ensure Registry image is available: %w", err)
+	}
+
 	// Create htpasswd file in the Docker volume
 	log.Println("Creating htpasswd file in Docker volume...")
 	if err := createHtpasswdFileInVolume(); err != nil {
