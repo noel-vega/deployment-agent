@@ -104,6 +104,7 @@ func main() {
 
 		// Projects endpoints (if projects service is configured)
 		if projectsHandler != nil {
+			r.Post("/projects", projectsHandler.Create)
 			r.Get("/projects", projectsHandler.List)
 			r.Get("/projects/{name}", projectsHandler.Get)
 			r.Get("/projects/{name}/compose", projectsHandler.GetCompose)
@@ -112,6 +113,9 @@ func main() {
 			r.Get("/projects/{name}/environment", projectsHandler.GetEnvironment)
 			r.Get("/projects/{name}/networks", projectsHandler.GetNetworks)
 			r.Get("/projects/{name}/services", projectsHandler.GetServices)
+			r.Post("/projects/{name}/services", projectsHandler.AddService)
+			r.Put("/projects/{name}/services/{service}", projectsHandler.UpdateService)
+			r.Delete("/projects/{name}/services/{service}", projectsHandler.DeleteService)
 			r.Post("/projects/{name}/services/{service}/start", projectsHandler.StartService)
 			r.Post("/projects/{name}/services/{service}/stop", projectsHandler.StopService)
 		}

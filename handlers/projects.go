@@ -241,3 +241,165 @@ func (h *ProjectsHandler) StopService(w http.ResponseWriter, r *http.Request) {
 		"service": serviceName,
 	})
 }
+
+func (h *ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.projectsService.CreateProject(ctx, req.Name)
+	if err != nil {
+		if err.Error() == "project already exists: "+req.Name {
+			http.Error(w, err.Error(), http.StatusConflict)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Get the created project info
+	project, err := h.projectsService.GetProject(ctx, req.Name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "project created successfully",
+		"project": project,
+	})
+}
+
+func (h *ProjectsHandler) AddService(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectName := chi.URLParam(r, "name")
+
+	if projectName == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+
+	var service projects.ComposeService
+	if err := json.NewDecoder(r.Body).Decode(&service); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if service.Name == "" {
+		http.Error(w, "service name is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.projectsService.AddService(ctx, projectName, service)
+	if err != nil {
+		if err.Error() == "service already exists: "+service.Name {
+			http.Error(w, err.Error(), http.StatusConflict)
+		} else if err.Error() == "project not found: "+projectName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "service added successfully",
+		"project": projectName,
+		"service": service.Name,
+	})
+}
+
+func (h *ProjectsHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectName := chi.URLParam(r, "name")
+	serviceName := chi.URLParam(r, "service")
+
+	if projectName == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+
+	if serviceName == "" {
+		http.Error(w, "service name is required", http.StatusBadRequest)
+		return
+	}
+
+	var service projects.ComposeService
+	if err := json.NewDecoder(r.Body).Decode(&service); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Use service name from URL
+	service.Name = serviceName
+
+	err := h.projectsService.UpdateService(ctx, projectName, service)
+	if err != nil {
+		if err.Error() == "service not found: "+serviceName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else if err.Error() == "project not found: "+projectName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "service updated successfully",
+		"project": projectName,
+		"service": serviceName,
+	})
+}
+
+func (h *ProjectsHandler) DeleteService(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectName := chi.URLParam(r, "name")
+	serviceName := chi.URLParam(r, "service")
+
+	if projectName == "" {
+		http.Error(w, "project name is required", http.StatusBadRequest)
+		return
+	}
+
+	if serviceName == "" {
+		http.Error(w, "service name is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.projectsService.DeleteService(ctx, projectName, serviceName)
+	if err != nil {
+		if err.Error() == "service not found: "+serviceName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else if err.Error() == "project not found: "+projectName {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "service deleted successfully",
+		"project": projectName,
+		"service": serviceName,
+	})
+}

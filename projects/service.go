@@ -65,7 +65,12 @@ type ComposeService struct {
 }
 
 type ComposeFile struct {
+	Version  string                 `yaml:"version,omitempty"`
 	Services map[string]interface{} `yaml:"services"`
+	Networks map[string]interface{} `yaml:"networks,omitempty"`
+	Volumes  map[string]interface{} `yaml:"volumes,omitempty"`
+	Secrets  map[string]interface{} `yaml:"secrets,omitempty"`
+	Configs  map[string]interface{} `yaml:"configs,omitempty"`
 }
 
 func NewService(dockerClient *client.Client) (*Service, error) {
@@ -765,6 +770,233 @@ func (s *Service) StopService(ctx context.Context, projectName, serviceName stri
 
 	if len(stopErrors) > 0 {
 		return fmt.Errorf("failed to stop some containers: %v", stopErrors)
+	}
+
+	return nil
+}
+
+// CreateProject creates a new project with an empty docker-compose.yml
+func (s *Service) CreateProject(ctx context.Context, name string) error {
+	// Validate project name
+	if name == "" {
+		return fmt.Errorf("project name cannot be empty")
+	}
+
+	// Check if project already exists
+	projectPath := filepath.Join(s.rootPath, name)
+	if _, err := os.Stat(projectPath); err == nil {
+		return fmt.Errorf("project already exists: %s", name)
+	}
+
+	// Create project directory
+	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		return fmt.Errorf("failed to create project directory: %w", err)
+	}
+
+	// Create minimal docker-compose.yml
+	// Note: version field is obsolete in Docker Compose v2 and should be omitted
+	compose := ComposeFile{
+		Services: make(map[string]interface{}),
+	}
+
+	composeFilePath := filepath.Join(projectPath, "docker-compose.yml")
+	output, err := yaml.Marshal(&compose)
+	if err != nil {
+		return fmt.Errorf("failed to marshal compose file: %w", err)
+	}
+
+	if err := os.WriteFile(composeFilePath, output, 0644); err != nil {
+		return fmt.Errorf("failed to write compose file: %w", err)
+	}
+
+	return nil
+}
+
+// AddService adds a new service to an existing project
+func (s *Service) AddService(ctx context.Context, projectName string, service ComposeService) error {
+	// Validate service name
+	if service.Name == "" {
+		return fmt.Errorf("service name cannot be empty")
+	}
+
+	return s.updateComposeFile(projectName, func(compose *ComposeFile) error {
+		// Check if service already exists
+		if _, exists := compose.Services[service.Name]; exists {
+			return fmt.Errorf("service already exists: %s", service.Name)
+		}
+
+		// Build service configuration
+		serviceConfig := make(map[string]interface{})
+
+		if service.Image != "" {
+			serviceConfig["image"] = service.Image
+		}
+
+		if service.Build != "" {
+			serviceConfig["build"] = service.Build
+		}
+
+		if len(service.Ports) > 0 {
+			serviceConfig["ports"] = service.Ports
+		}
+
+		if len(service.Environment) > 0 {
+			serviceConfig["environment"] = service.Environment
+		}
+
+		if len(service.Volumes) > 0 {
+			serviceConfig["volumes"] = service.Volumes
+		}
+
+		if len(service.DependsOn) > 0 {
+			serviceConfig["depends_on"] = service.DependsOn
+		}
+
+		if len(service.Networks) > 0 {
+			serviceConfig["networks"] = service.Networks
+		}
+
+		if service.Restart != "" {
+			serviceConfig["restart"] = service.Restart
+		}
+
+		if service.Command != "" {
+			serviceConfig["command"] = service.Command
+		}
+
+		compose.Services[service.Name] = serviceConfig
+		return nil
+	})
+}
+
+// UpdateService updates an existing service in a project
+func (s *Service) UpdateService(ctx context.Context, projectName string, service ComposeService) error {
+	// Validate service name
+	if service.Name == "" {
+		return fmt.Errorf("service name cannot be empty")
+	}
+
+	return s.updateComposeFile(projectName, func(compose *ComposeFile) error {
+		// Check if service exists
+		if _, exists := compose.Services[service.Name]; !exists {
+			return fmt.Errorf("service not found: %s", service.Name)
+		}
+
+		// Build updated service configuration
+		serviceConfig := make(map[string]interface{})
+
+		if service.Image != "" {
+			serviceConfig["image"] = service.Image
+		}
+
+		if service.Build != "" {
+			serviceConfig["build"] = service.Build
+		}
+
+		if len(service.Ports) > 0 {
+			serviceConfig["ports"] = service.Ports
+		}
+
+		if len(service.Environment) > 0 {
+			serviceConfig["environment"] = service.Environment
+		}
+
+		if len(service.Volumes) > 0 {
+			serviceConfig["volumes"] = service.Volumes
+		}
+
+		if len(service.DependsOn) > 0 {
+			serviceConfig["depends_on"] = service.DependsOn
+		}
+
+		if len(service.Networks) > 0 {
+			serviceConfig["networks"] = service.Networks
+		}
+
+		if service.Restart != "" {
+			serviceConfig["restart"] = service.Restart
+		}
+
+		if service.Command != "" {
+			serviceConfig["command"] = service.Command
+		}
+
+		compose.Services[service.Name] = serviceConfig
+		return nil
+	})
+}
+
+// DeleteService removes a service from a project
+func (s *Service) DeleteService(ctx context.Context, projectName, serviceName string) error {
+	if serviceName == "" {
+		return fmt.Errorf("service name cannot be empty")
+	}
+
+	return s.updateComposeFile(projectName, func(compose *ComposeFile) error {
+		// Check if service exists
+		if _, exists := compose.Services[serviceName]; !exists {
+			return fmt.Errorf("service not found: %s", serviceName)
+		}
+
+		delete(compose.Services, serviceName)
+		return nil
+	})
+}
+
+// updateComposeFile is a helper function to safely update docker-compose.yml
+func (s *Service) updateComposeFile(projectName string, updateFn func(*ComposeFile) error) error {
+	projectPath := filepath.Join(s.rootPath, projectName)
+
+	// Check if project exists
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		return fmt.Errorf("project not found: %s", projectName)
+	}
+
+	// Find compose file
+	var composeFilePath string
+	for _, filename := range []string{"docker-compose.yml", "docker-compose.yaml"} {
+		path := filepath.Join(projectPath, filename)
+		if _, err := os.Stat(path); err == nil {
+			composeFilePath = path
+			break
+		}
+	}
+
+	if composeFilePath == "" {
+		return fmt.Errorf("no docker-compose file found in project: %s", projectName)
+	}
+
+	// Read existing compose file
+	content, err := os.ReadFile(composeFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read compose file: %w", err)
+	}
+
+	// Parse compose file
+	var compose ComposeFile
+	if err := yaml.Unmarshal(content, &compose); err != nil {
+		return fmt.Errorf("failed to parse compose file: %w", err)
+	}
+
+	// Ensure services map is initialized
+	if compose.Services == nil {
+		compose.Services = make(map[string]interface{})
+	}
+
+	// Apply update function
+	if err := updateFn(&compose); err != nil {
+		return err
+	}
+
+	// Marshal back to YAML
+	output, err := yaml.Marshal(&compose)
+	if err != nil {
+		return fmt.Errorf("failed to marshal compose file: %w", err)
+	}
+
+	// Write back to file
+	if err := os.WriteFile(composeFilePath, output, 0644); err != nil {
+		return fmt.Errorf("failed to write compose file: %w", err)
 	}
 
 	return nil
