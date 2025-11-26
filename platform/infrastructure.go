@@ -21,16 +21,16 @@ func EnsureInfrastructure(dockerClient *client.Client) error {
 		return err
 	}
 
-	// Ensure Traefik is running (if enabled)
-	traefikConfig := GetTraefikConfig()
-	if err := EnsureTraefik(dockerClient, traefikConfig); err != nil {
-		return err
+	// Check Traefik status (managed via docker-compose.yml)
+	if err := EnsureTraefik(dockerClient); err != nil {
+		log.Printf("Warning: %v", err)
+		// Don't fail startup - Traefik is optional
 	}
 
-	// Ensure Registry is running (if enabled)
-	registryConfig := GetRegistryConfig()
-	if err := EnsureRegistry(dockerClient, registryConfig); err != nil {
-		return err
+	// Check Registry status (managed via docker-compose.yml)
+	if err := EnsureRegistry(dockerClient); err != nil {
+		log.Printf("Warning: %v", err)
+		// Don't fail startup - Registry is optional
 	}
 
 	return nil

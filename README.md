@@ -1,19 +1,19 @@
 # Hubble
 
-**The complete self-hosted Docker platform with auto-provisioned infrastructure.**
+**The complete self-hosted Docker platform with declarative infrastructure.**
 
 Hubble is a production-ready platform for managing Docker containers and Compose projects. Deploy apps with automatic HTTPS, store images in your own registry, and manage everything through a simple REST API.
 
 ## Features
 
-- **Auto-provisioned Infrastructure** - Network, Traefik, and Registry automatically created on startup
-- **Built-in Docker Registry** - Private image storage with automatic HTTPS (enabled by default)
+- **Declarative Infrastructure** - All services defined in docker-compose.yml (v2.0)
+- **Built-in Docker Registry** - Private image storage with automatic HTTPS
 - **Docker Volume Management** - Persistent storage with zero permission issues
 - **Project Management API** - Create and manage Docker Compose projects via REST API
 - **Traefik Integration** - Automatic HTTPS and routing with Let's Encrypt
 - **Secure Authentication** - JWT-based auth with refresh token rotation
 - **Container Monitoring** - List, start, stop, and inspect containers
-- **Zero Configuration** - Just works out of the box
+- **React Web UI** - Modern frontend for managing your infrastructure
 
 ## Quick Start
 
@@ -37,26 +37,21 @@ JWT_REFRESH_SECRET=$(openssl rand -base64 32)
 
 # For production with HTTPS
 HUBBLE_DOMAIN=yourdomain.com
-HUBBLE_TRAEFIK_ENABLED=true
 HUBBLE_TRAEFIK_EMAIL=admin@yourdomain.com
 ```
 
 ### 2. Start Hubble
 
 ```bash
-# Using Docker Compose (recommended)
-docker-compose up -d
-
-# Or build and run locally
-make build
-make run
+docker compose up -d
 ```
 
-Hubble will automatically:
-- ✅ Create the `hubble` Docker network
-- ✅ Start the API server on port 3000
-- ✅ Start the Docker Registry (enabled by default)
-- ✅ Optionally start Traefik for HTTPS (if `HUBBLE_TRAEFIK_ENABLED=true`)
+This starts all services:
+- ✅ **hubble-traefik** - Reverse proxy with automatic HTTPS
+- ✅ **hubble-registry** - Private Docker registry
+- ✅ **hubble-server** - REST API backend
+- ✅ **hubble-web** - React frontend UI
+- ✅ **hubble network** - Shared container network
 
 ### 3. Login
 
@@ -94,11 +89,12 @@ curl -X POST http://localhost:3000/projects/my-blog/services \
 
 Hubble is a **complete platform** for self-hosted Docker infrastructure. It provides:
 
-### Infrastructure as Code
-- Automatically creates a shared `hubble` Docker network
-- Auto-provisions Docker Registry for private image storage
-- Optionally provisions Traefik reverse proxy
-- All managed services are labeled with `com.hubble.managed=true`
+### Declarative Infrastructure (v2.0)
+- All services defined in `docker-compose.yml`
+- Shared `hubble` Docker network
+- Docker Registry for private image storage
+- Traefik reverse proxy with automatic HTTPS
+- All managed services labeled with `com.hubble.managed=true`
 
 ### Built-in Registry
 - Private Docker registry at `registry.yourdomain.com`
@@ -135,13 +131,31 @@ curl -X POST /projects/myapp/services \
 
 ## Architecture
 
+### v2.0 Service Architecture
+```
+┌─────────────────────────────────────────────────────────┐
+│ docker-compose.yml (ALL infrastructure)                 │
+├─────────────────────────────────────────────────────────┤
+│                                                           │
+│  hubble-traefik     → HTTPS reverse proxy                │
+│  hubble-registry    → Docker image storage               │
+│  hubble-server      → API backend (Go)                   │
+│  hubble-web         → React frontend                     │
+│  registry-init      → One-time auth setup                │
+│                                                           │
+│  hubble network     → Shared container network           │
+│                                                           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Request Flow
 ```
 Internet → Traefik → Hubble Network
                           ↓
            ┌──────────────┼──────────────┐
            ↓              ↓              ↓
-    hubble-server  hubble-registry  user projects
-         (API)      (Images)        (Apps)
+    hubble-web     hubble-server   hubble-registry
+    (Frontend)        (API)         (Images)
 ```
 
 ### Persistent Storage
@@ -161,10 +175,10 @@ Hubble uses Docker-managed volumes for all persistent data:
 
 ## Use Cases
 
-- **Complete Self-Hosted Platform** - Everything you need: API, registry, routing, HTTPS
+- **Complete Self-Hosted Platform** - Everything you need: API, registry, routing, HTTPS, web UI
 - **Private Image Storage** - No Docker Hub rate limits, full control of your images
-- **Dev/Staging Environment** - Quick project setup with built-in infrastructure
-- **Learning Docker** - REST API for Docker Compose operations
+- **Dev/Staging Environment** - Quick project setup with declarative infrastructure
+- **Learning Docker** - REST API + Web UI for Docker Compose operations
 - **Automated Deployments** - API-driven infrastructure with built-in registry
 
 ## Documentation
@@ -174,6 +188,11 @@ Hubble uses Docker-managed volumes for all persistent data:
 - **[API.md](API.md)** - Complete API reference
 - **[TRAEFIK.md](TRAEFIK.md)** - Traefik integration and examples
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development workflow and testing
+
+### Migration Guides
+- **[PHASE3_NOTES.md](PHASE3_NOTES.md)** - v2.0 migration (declarative infrastructure)
+- **[PHASE2_NOTES.md](PHASE2_NOTES.md)** - v1.1 deprecation warnings
+- **[PHASE1_NOTES.md](PHASE1_NOTES.md)** - v1.0 docker-compose integration
 
 ## Requirements
 
@@ -210,7 +229,7 @@ docker-compose down     # Stop everything
 
 ## Environment Variables
 
-Key environment variables:
+Key environment variables (v2.0):
 
 ```bash
 # Authentication (required)
@@ -219,20 +238,21 @@ ADMIN_PASSWORD=your-password
 JWT_ACCESS_SECRET=random-secret-32-chars
 JWT_REFRESH_SECRET=different-random-secret
 
-# Platform Domain (for HTTPS access to registry and Traefik)
+# Platform Domain (for HTTPS access)
 HUBBLE_DOMAIN=yourdomain.com
 
-# Registry (enabled by default)
-HUBBLE_REGISTRY_ENABLED=true
-HUBBLE_REGISTRY_DELETE_ENABLED=true
-
-# Traefik (optional, recommended for production)
-HUBBLE_TRAEFIK_ENABLED=false
+# Traefik (for Let's Encrypt HTTPS)
 HUBBLE_TRAEFIK_EMAIL=admin@example.com
+HUBBLE_TRAEFIK_DASHBOARD=false
+
+# Registry
+HUBBLE_REGISTRY_DELETE_ENABLED=true
 
 # Projects
 PROJECTS_ROOT_PATH=/projects
 ```
+
+**Note:** In v2.0, all infrastructure is defined in docker-compose.yml. Environment variables are used for configuration only, not for enabling/disabling services.
 
 See [SETUP.md](SETUP.md) for complete configuration details.
 
