@@ -20,3 +20,4 @@ TESTING_SUMMARY.md
 
 # Go workspace
 go.work
+.env.production

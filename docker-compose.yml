@@ -23,8 +23,6 @@ services:
       - HUBBLE_DOMAIN=${HUBBLE_DOMAIN}
       - HUBBLE_TRAEFIK_ENABLED=${HUBBLE_TRAEFIK_ENABLED:-false}
       - HUBBLE_TRAEFIK_EMAIL=${HUBBLE_TRAEFIK_EMAIL}
-      - HUBBLE_TRAEFIK_DASHBOARD=${HUBBLE_TRAEFIK_DASHBOARD:-false}
-      - HUBBLE_TRAEFIK_DASHBOARD_AUTH=${HUBBLE_TRAEFIK_DASHBOARD_AUTH}
       - HUBBLE_REGISTRY_ENABLED=${HUBBLE_REGISTRY_ENABLED:-true}
       - HUBBLE_REGISTRY_DELETE_ENABLED=${HUBBLE_REGISTRY_DELETE_ENABLED:-true}
       - HUBBLE_REGISTRY_STORAGE=/var/lib/hubble/registry
@@ -34,8 +32,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hubble-api.rule=Host(`hubble.${HUBBLE_DOMAIN:-localhost}`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.hubble-api.entrypoints=websecure"
-      - "traefik.http.routers.hubble-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hubble-api.entrypoints=web"
       - "traefik.http.routers.hubble-api.priority=2"
       - "traefik.http.services.hubble-api.loadbalancer.server.port=5000"
       - "traefik.http.middlewares.hubble-api-stripprefix.stripprefix.prefixes=/api"
@@ -50,31 +47,30 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hubble-web.rule=Host(`hubble.${HUBBLE_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.hubble-web.entrypoints=websecure"
-      - "traefik.http.routers.hubble-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hubble-web.entrypoints=web"
       - "traefik.http.routers.hubble-web.priority=1"
       - "traefik.http.services.hubble-web.loadbalancer.server.port=80"
 
   hubble-traefik:
-    image: traefik:v3.0
+    image: traefik:v3.6
     container_name: hubble-traefik
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-      - "127.0.0.1:8080:8080"  # Dashboard (localhost only)
     command:
       - --providers.docker=true
       - --providers.docker.network=hubble
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --certificatesresolvers.letsencrypt.acme.email=${HUBBLE_TRAEFIK_EMAIL}
+      # Development: Disable HTTPS redirect when HUBBLE_DOMAIN=localhost
+      # Production: Enable by uncommenting these lines and setting HUBBLE_TRAEFIK_EMAIL
+      # - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      # - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.email=${HUBBLE_TRAEFIK_EMAIL:-noreply@localhost}
       - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
-      - --api.dashboard=${HUBBLE_TRAEFIK_DASHBOARD:-false}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - hubble-traefik-data:/data
@@ -116,8 +112,7 @@ services:
       com.hubble.service: "registry"
       traefik.enable: "true"
       traefik.http.routers.registry.rule: "Host(`registry.${HUBBLE_DOMAIN:-localhost}`)"
-      traefik.http.routers.registry.entrypoints: "websecure"
-      traefik.http.routers.registry.tls.certresolver: "letsencrypt"
+      traefik.http.routers.registry.entrypoints: "web"
       traefik.http.services.registry.loadbalancer.server.port: "5000"
 
 volumes:

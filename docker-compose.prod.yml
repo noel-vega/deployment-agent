@@ -1,0 +1,50 @@
+# Production override for docker-compose.yml
+# Use with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Enables HTTPS with Let's Encrypt certificates
+
+services:
+  hubble-traefik:
+    command:
+      - --providers.docker=true
+      - --providers.docker.network=hubble
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # Enable HTTPS redirect for production
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.email=${HUBBLE_TRAEFIK_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+
+  hubble-server:
+    environment:
+      - ENVIRONMENT=production
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hubble-api.rule=Host(`hubble.${HUBBLE_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.hubble-api.entrypoints=websecure"
+      - "traefik.http.routers.hubble-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hubble-api.priority=2"
+      - "traefik.http.services.hubble-api.loadbalancer.server.port=5000"
+      - "traefik.http.middlewares.hubble-api-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.hubble-api.middlewares=hubble-api-stripprefix"
+
+  hubble-web:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hubble-web.rule=Host(`hubble.${HUBBLE_DOMAIN}`)"
+      - "traefik.http.routers.hubble-web.entrypoints=websecure"
+      - "traefik.http.routers.hubble-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hubble-web.priority=1"
+      - "traefik.http.services.hubble-web.loadbalancer.server.port=80"
+
+  hubble-registry:
+    labels:
+      com.hubble.managed: "true"
+      com.hubble.service: "registry"
+      traefik.enable: "true"
+      traefik.http.routers.registry.rule: "Host(`registry.${HUBBLE_DOMAIN}`)"
+      traefik.http.routers.registry.entrypoints: "websecure"
+      traefik.http.routers.registry.tls.certresolver: "letsencrypt"
+      traefik.http.services.registry.loadbalancer.server.port: "5000"
