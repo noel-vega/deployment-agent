@@ -84,8 +84,19 @@ func EnsureTraefik(dockerClient *client.Client, config TraefikConfig) error {
 		return nil
 	}
 
-	// Container doesn't exist, create it
-	log.Println("Creating Traefik container...")
+	// Container doesn't exist - log deprecation warning
+	log.Println("⚠️  WARNING: Traefik container not found!")
+	log.Println("⚠️  DEPRECATED: Programmatic Traefik creation is deprecated.")
+	log.Println("⚠️  Please add hubble-traefik service to your docker-compose.yml")
+	log.Println("⚠️  See: https://github.com/noel-vega/hubble#infrastructure-services")
+
+	// Check if fallback creation is disabled
+	if os.Getenv("HUBBLE_DISABLE_PLATFORM_FALLBACK") == "true" {
+		log.Println("⚠️  Fallback creation disabled. Please start Traefik via docker-compose.")
+		return fmt.Errorf("Traefik container not found and fallback creation is disabled")
+	}
+
+	log.Println("Creating Traefik container via fallback (deprecated)...")
 	return createTraefikContainer(dockerClient, config)
 }
 

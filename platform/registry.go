@@ -122,8 +122,19 @@ func EnsureRegistry(dockerClient *client.Client, config RegistryConfig) error {
 		return nil
 	}
 
-	// Container doesn't exist, create it
-	log.Println("Creating Registry container...")
+	// Container doesn't exist - log deprecation warning
+	log.Println("⚠️  WARNING: Registry container not found!")
+	log.Println("⚠️  DEPRECATED: Programmatic Registry creation is deprecated.")
+	log.Println("⚠️  Please add hubble-registry service to your docker-compose.yml")
+	log.Println("⚠️  See: https://github.com/noel-vega/hubble#infrastructure-services")
+
+	// Check if fallback creation is disabled
+	if os.Getenv("HUBBLE_DISABLE_PLATFORM_FALLBACK") == "true" {
+		log.Println("⚠️  Fallback creation disabled. Please start Registry via docker-compose.")
+		return fmt.Errorf("Registry container not found and fallback creation is disabled")
+	}
+
+	log.Println("Creating Registry container via fallback (deprecated)...")
 	return createRegistryContainer(dockerClient, config)
 }
 
